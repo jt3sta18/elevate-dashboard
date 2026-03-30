@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-<title>Elevate Kitchen &amp; Home --" KPI Dashboard</title>
+<title>Elevate Kitchen &amp; Home -- KPI Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -229,8 +229,8 @@ const EMAIL_RECIPIENTS=["sales@elevatekitchenandhome.com"];let state={
   filterMonth:"All",filterSalesperson:"All",filterMargin:"All"
 };
 
-const fmt$=n=>(n==null||n===""||isNaN(n))?"--"":"$"+Number(n).toLocaleString("en-US",{maximumFractionDigits:0});
-const fmtPct=n=>(n==null||isNaN(n))?"--"":(n*100).toFixed(1)+"%";
+const fmt$=n=>(n==null||n===""||isNaN(n))?"--":"$"+Number(n).toLocaleString("en-US",{maximumFractionDigits:0});
+const fmtPct=n=>(n==null||isNaN(n))?"--":(n*100).toFixed(1)+"%";
 const daysBetween=(a,b)=>(!a||!b)?null:Math.round((new Date(b)-new Date(a))/86400000);
 const isBool=v=>v===true||v==="TRUE"||v==="true";
 const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
@@ -467,7 +467,7 @@ function render(){
     html+=kpiCard("Avg Contract",kpis.avgContract,kpis.avgContract,TARGETS.avgContract,fmt$(TARGETS.avgContract),fmt$,false,"Average across all jobs",cVals);
     html+=kpiCard("Labor %",kpis.avgLaborPct,kpis.avgLaborPct,TARGETS.laborPct,fmtPct(TARGETS.laborPct),fmtPct,true,"Labor cost as % of contract",null);
     html+=kpiCard("Gross Margin",kpis.avgGrossMargin,kpis.avgGrossMargin,TARGETS.grossMargin,fmtPct(TARGETS.grossMargin),fmtPct,false,"Profit after all costs",mVals);
-    html+=kpiCard("Avg Install Days",kpis.avgInstallDays,kpis.avgInstallDays,TARGETS.installDays,TARGETS.installDays+" days",function(v){return v!=null?v.toFixed(1):"--"";},true,"Avg days to complete install",null);
+    html+=kpiCard("Avg Install Days",kpis.avgInstallDays,kpis.avgInstallDays,TARGETS.installDays,TARGETS.installDays+" days",function(v){return v!=null?v.toFixed(1):"--";},true,"Avg days to complete install",null);
     html+=kpiCard("Close Rate",kpis.closeRate,kpis.closeRate,null,null,fmtPct,false,"Won / (Won + Lost) leads",null);
     html+=kpiCard("Avg Profit/Job",kpis.avgProfitPerJob,kpis.avgProfitPerJob,null,null,fmt$,false,"Avg gross profit per completed job",null);
     if(matRevenue>0)html+=kpiCard("Materials Rev",matRevenue,matRevenue,null,null,fmt$,false,"Total materials-only revenue (separate)",null);
@@ -525,7 +525,7 @@ function render(){
         html+='<td class="c-gray" style="font-family:monospace;font-size:11px">'+esc(m.date||"")+'</td>';
         html+='<td style="font-weight:600;color:#5eead4">'+fmt$(parseFloat(m.materialRevenue))+'</td>';
         html+='<td><span class="pill pill-amber">'+esc(m.salesperson||"")+'</span></td>';
-        html+='<td style="color:#8fa8bc;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+esc(m.notes||"--"")+'</td>';
+        html+='<td style="color:#8fa8bc;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+esc(m.notes||"--")+'</td>';
         html+='<td onclick="event.stopPropagation()"><button class="btn-ghost del" onclick="deleteMaterial(\''+m.id+'\')">&#x2715;</button></td></tr>';
       });}
       html+='</tbody></table></div>';
@@ -555,10 +555,10 @@ function render(){
           html+='<td><button class="expand-btn '+(isOpen?'open':'')+'" onclick="event.stopPropagation();toggleExpand(\''+j.id+'\')">&#x25B6;</button></td>';
           html+='<td style="font-weight:600;color:#EDE0C4">'+esc(j.client)+'</td>';
           html+='<td><span class="pill pill-amber" style="font-size:10px">'+esc(j.tier)+'</span></td>';
-          html+='<td><span class="pill pill-blue" style="font-size:10px">'+esc(j.salesperson||"--"")+'</span></td>';
+          html+='<td><span class="pill pill-blue" style="font-size:10px">'+esc(j.salesperson||"--")+'</span></td>';
           html+='<td style="font-weight:600">'+fmt$(j.contractPrice)+'</td>';
           html+='<td class="'+mc+'" style="font-weight:600">'+fmtPct(j.grossMarginPct)+'</td>';
-          html+='<td class="'+dc+'">'+(j.installDays!=null?j.installDays:"--"")+'</td>';
+          html+='<td class="'+dc+'">'+(j.installDays!=null?j.installDays:"--")+'</td>';
           html+='<td><span class="pill '+sp+'">'+esc(j.status)+'</span></td>';
           html+='<td onclick="event.stopPropagation()"><button class="pay-btn '+(j.depositPaid?'paid':'unpaid')+'" onclick="togglePay(\''+j.id+'\',\'depositPaid\')">'+(j.depositPaid?"&#x2713; Paid":"Unpaid")+'</button></td>';
           html+='<td onclick="event.stopPropagation()"><button class="pay-btn '+(j.midPaid?'paid':'unpaid')+'" onclick="togglePay(\''+j.id+'\',\'midPaid\')">'+(j.midPaid?"&#x2713; Paid":"Unpaid")+'</button></td>';
@@ -575,10 +575,10 @@ function render(){
             html+='<div class="detail-item"><div class="dl">Total Cost</div><div class="dv">'+fmt$(j.totalCost)+'</div></div>';
             html+='<div class="detail-item"><div class="dl">Gross Profit</div><div class="dv" style="color:'+(j.grossProfit>=0?'#34d399':'#f87171')+'">'+fmt$(j.grossProfit)+'</div></div>';
             html+='<div class="detail-item"><div class="dl">Labor %</div><div class="dv">'+fmtPct(j.laborPct)+'</div></div>';
-            html+='<div class="detail-item"><div class="dl">Budgeted Hrs</div><div class="dv">'+(j.budgetedHours||"--"")+'</div></div>';
-            html+='<div class="detail-item"><div class="dl">Actual Hrs</div><div class="dv">'+(j.actualHours||"--"")+'</div></div>';
-            html+='<div class="detail-item"><div class="dl">Install Start</div><div class="dv">'+(j.installStart||"--"")+'</div></div>';
-            html+='<div class="detail-item"><div class="dl">Install End</div><div class="dv">'+(j.installEnd||"--"")+'</div></div>';
+            html+='<div class="detail-item"><div class="dl">Budgeted Hrs</div><div class="dv">'+(j.budgetedHours||"--")+'</div></div>';
+            html+='<div class="detail-item"><div class="dl">Actual Hrs</div><div class="dv">'+(j.actualHours||"--")+'</div></div>';
+            html+='<div class="detail-item"><div class="dl">Install Start</div><div class="dv">'+(j.installStart||"--")+'</div></div>';
+            html+='<div class="detail-item"><div class="dl">Install End</div><div class="dv">'+(j.installEnd||"--")+'</div></div>';
             html+='<div class="detail-item"><div class="dl">Deposit ('+(j.depositPct||0)+'%)</div><div class="dv">'+fmt$(j.depositAmt)+'</div></div>';
             html+='<div class="detail-item"><div class="dl">Mid ('+(j.midPct||0)+'%)</div><div class="dv">'+fmt$(j.midAmt)+'</div></div>';
             html+='<div class="detail-item"><div class="dl">Final ('+(j.finalPct||0)+'%)</div><div class="dv">'+fmt$(j.finalAmt)+'</div></div>';
@@ -626,13 +626,13 @@ function render(){
         var st=l.status||"Pending";
         var stPill=st==="Won"?"pill-green":st==="Lost"?"pill-red":"pill-amber";
         html+='<tr>';
-        html+='<td style="font-weight:600;color:#EDE0C4">'+esc(l.customerName||"--"")+'</td>';
+        html+='<td style="font-weight:600;color:#EDE0C4">'+esc(l.customerName||"--")+'</td>';
         html+='<td class="c-gray" style="font-family:monospace;font-size:11px">'+esc(l.dateOfEstimate||l.date||"")+'</td>';
-        html+='<td><span class="pill pill-blue" style="font-size:10px">'+esc(l.salesperson||"--"")+'</span></td>';
+        html+='<td><span class="pill pill-blue" style="font-size:10px">'+esc(l.salesperson||"--")+'</span></td>';
         html+='<td style="color:#d4d4d8">'+esc(l.leadSource||l.source||"")+'</td>';
         html+='<td>'+fmt$(parseFloat(l.estimateAmount||l.proposalAmount))+'</td>';
         html+='<td><span class="pill '+stPill+'">'+esc(st)+'</span></td>';
-        html+='<td style="color:#8fa8bc;max-width:160px;overflow:hidden;text-overflow:ellipsis">'+esc(l.notes||"--"")+'</td>';
+        html+='<td style="color:#8fa8bc;max-width:160px;overflow:hidden;text-overflow:ellipsis">'+esc(l.notes||"--")+'</td>';
         html+='<td onclick="event.stopPropagation()"><button class="btn-ghost" onclick="editLead(\''+l.id+'\')">&#x270E;</button></td>';
         html+='<td onclick="event.stopPropagation()"><button class="btn-ghost del" onclick="deleteLead(\''+l.id+'\')">&#x2715;</button></td>';
         html+='</tr>';
@@ -650,7 +650,7 @@ function render(){
         html+='<td class="c-gray" style="font-family:monospace;font-size:11px">'+esc(m.date||"")+'</td>';
         html+='<td style="font-weight:600">'+fmt$(parseFloat(m.materialRevenue))+'</td>';
         html+='<td><span class="pill pill-amber">'+esc(m.salesperson||"")+'</span></td>';
-        html+='<td style="color:#8fa8bc">'+esc(m.notes||"--"")+'</td>';
+        html+='<td style="color:#8fa8bc">'+esc(m.notes||"--")+'</td>';
         html+='<td><button class="btn-ghost del" onclick="deleteMaterial(\''+m.id+'\')">&#x2715;</button></td>';
         html+='</tr>';
       });
@@ -667,11 +667,11 @@ function render(){
       html+='<div class="sp-card">';
       html+='<div class="sp-card-header"><div class="sp-avatar">'+esc(d.sp)+'</div><div><div class="sp-name">'+esc(d.sp)+'</div><div class="sp-sub">'+d.jobCount+' jobs &bull; '+d.leadsCount+' leads</div></div></div>';
       html+='<div class="sp-stats">';
-      html+='<div class="sp-stat"><div class="sl">Close Rate</div><div class="sv '+(d.closeRate!=null?(d.closeRate>=0.5?"c-green":"c-red"):"c-gray")+'">'+(d.closeRate!=null?fmtPct(d.closeRate):"--"")+'</div></div>';
+      html+='<div class="sp-stat"><div class="sl">Close Rate</div><div class="sv '+(d.closeRate!=null?(d.closeRate>=0.5?"c-green":"c-red"):"c-gray")+'">'+(d.closeRate!=null?fmtPct(d.closeRate):"--")+'</div></div>';
       html+='<div class="sp-stat"><div class="sl">Total Revenue</div><div class="sv">'+fmt$(d.totalRevenue)+'</div></div>';
       html+='<div class="sp-stat"><div class="sl">Avg Deal Size</div><div class="sv">'+fmt$(d.avgDealSize)+'</div></div>';
       html+='<div class="sp-stat"><div class="sl">Total Gross Profit</div><div class="sv">'+fmt$(d.totalProfit)+'</div></div>';
-      html+='<div class="sp-stat"><div class="sl">GP Margin</div><div class="sv '+(d.grossMarginPct!=null?(d.grossMarginPct>=TARGETS.grossMargin?"c-green":"c-red"):"c-gray")+'">'+(d.grossMarginPct!=null?fmtPct(d.grossMarginPct):"--"")+'</div></div>';
+      html+='<div class="sp-stat"><div class="sl">GP Margin</div><div class="sv '+(d.grossMarginPct!=null?(d.grossMarginPct>=TARGETS.grossMargin?"c-green":"c-red"):"c-gray")+'">'+(d.grossMarginPct!=null?fmtPct(d.grossMarginPct):"--")+'</div></div>';
       html+='<div class="sp-stat"><div class="sl">Avg Profit/Job</div><div class="sv">'+fmt$(d.avgProfitPerJob)+'</div></div>';
       html+='<div class="sp-stat"><div class="sl">Jobs (Completed)</div><div class="sv">'+d.completedCount+' / '+d.jobCount+'</div></div>';
       html+='<div class="sp-stat"><div class="sl">Leads W/L</div><div class="sv"><span class="c-green">'+d.wonCount+'</span> / <span class="c-red">'+d.lostCount+'</span></div></div>';
@@ -686,7 +686,7 @@ function render(){
 }
 
 function kpiCard(label,value,rawVal,target,targetLabel,formatFn,flip,tooltipText,sparkData){
-  var formatted=formatFn?formatFn(value):(value!=null?value:"--"");
+  var formatted=formatFn?formatFn(value):(value!=null?value:"--");
   var hasTarget=target!=null&&rawVal!=null&&!isNaN(rawVal);
   var meets=flip?rawVal<=target:rawVal>=target;
   var valColor=hasTarget?(meets?"c-green":"c-red"):"c-white";
