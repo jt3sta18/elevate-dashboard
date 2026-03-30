@@ -257,10 +257,19 @@ function getMonthKey(dateStr){
 
 async function api(action,data={}){
   const payload=action!=="getAll"?"&data="+encodeURIComponent(JSON.stringify(data)):"";
-  const res=await fetch(SCRIPT_URL+"?action="+action+payload);
-  const json=await res.json();
-  if(!json.ok)throw new Error(json.error);
-  return json.data;
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),12000);
+  try{
+    const res=await fetch(SCRIPT_URL+"?action="+action+payload,{signal:controller.signal});
+    clearTimeout(timer);
+    const json=await res.json();
+    if(!json.ok)throw new Error(json.error);
+    return json.data;
+  }catch(e){
+    clearTimeout(timer);
+    if(e.name==="AbortError")throw new Error("Request timed out — check your Google Apps Script deployment.");
+    throw e;
+  }
 }
 
 // Feature 7: Email notification (best-effort, non-blocking)
