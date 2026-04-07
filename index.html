@@ -497,6 +497,21 @@ function render(){
     });
     html+='</div></div></div>';
 
+    // Materials Only data row
+    if(filteredMats.length>0){
+      const matTypes=["Flooring","Countertop","Cabinets","Tile"];
+      const matTypeIcons={"Flooring":"&#x1F9F1;","Countertop":"&#x1FAA8;","Cabinets":"&#x1F6AA;","Tile":"&#x25A6;"};
+      html+='<div class="section-gap"><div class="section-label">Materials Only</div><div class="targets-card"><div class="grid-targets">';
+      html+='<div class="target-row"><span style="display:flex;align-items:center"><span class="target-icon">&#x1F4B0;</span><span style="color:#8fa8bc">Total Revenue</span></span><span style="font-weight:700;color:#5eead4">'+fmt$(filteredMats.reduce((s,m)=>s+(parseFloat(m.materialRevenue)||0),0))+'</span></div>';
+      html+='<div class="target-row"><span style="display:flex;align-items:center"><span class="target-icon">&#x1F4CB;</span><span style="color:#8fa8bc">Entries</span></span><span style="font-weight:700">'+filteredMats.length+'</span></div>';
+      matTypes.forEach(function(t){
+        const rev=filteredMats.filter(m=>m.materialType===t).reduce((s,m)=>s+(parseFloat(m.materialRevenue)||0),0);
+        const cnt=filteredMats.filter(m=>m.materialType===t).length;
+        if(cnt>0){html+='<div class="target-row"><span style="display:flex;align-items:center"><span class="target-icon">'+matTypeIcons[t]+'</span><span style="color:#8fa8bc">'+t+'</span></span><span style="font-weight:700">'+fmt$(rev)+' <span style="font-size:11px;color:#8fa8bc">('+cnt+')</span></span></div>';}
+      });
+      html+='</div></div></div>';
+    }
+
     // Jobs table header row with buttons
     html+='<div class="section-gap">';
     html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">';
@@ -518,11 +533,12 @@ function render(){
     // Show materials only section if filter is "Materials Only"
     if(state.statusFilter==="Materials Only"){
       const matList=filteredMats.filter(m=>!state.search||(m.customerName||"").toLowerCase().includes(state.search.toLowerCase()));
-      html+='<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Date</th><th>Material Revenue</th><th>Salesperson</th><th>Notes</th><th></th></tr></thead><tbody>';
-      if(matList.length===0){html+='<tr class="empty-row"><td colspan="6">No materials-only entries yet.</td></tr>';}
+      html+='<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Date</th><th>Type</th><th>Material Revenue</th><th>Salesperson</th><th>Notes</th><th></th></tr></thead><tbody>';
+      if(matList.length===0){html+='<tr class="empty-row"><td colspan="7">No materials-only entries yet.</td></tr>';}
       else{matList.forEach(function(m){
         html+='<tr><td style="font-weight:600;color:#EDE0C4">'+esc(m.customerName)+'</td>';
         html+='<td class="c-gray" style="font-family:monospace;font-size:11px">'+esc(m.date||"")+'</td>';
+        html+='<td><span class="pill pill-teal">'+esc(m.materialType||"--")+'</span></td>';
         html+='<td style="font-weight:600;color:#5eead4">'+fmt$(parseFloat(m.materialRevenue))+'</td>';
         html+='<td><span class="pill pill-amber">'+esc(m.salesperson||"")+'</span></td>';
         html+='<td style="color:#8fa8bc;max-width:200px;overflow:hidden;text-overflow:ellipsis">'+esc(m.notes||"--")+'</td>';
@@ -643,11 +659,12 @@ function render(){
     // Materials Only section in pipeline
     if(filteredMats.length>0){
       html+='<div class="section-label" style="margin-top:24px">Materials Only</div>';
-      html+='<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Date</th><th>Revenue</th><th>Salesperson</th><th>Notes</th><th></th></tr></thead><tbody>';
+      html+='<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Date</th><th>Type</th><th>Revenue</th><th>Salesperson</th><th>Notes</th><th></th></tr></thead><tbody>';
       filteredMats.forEach(function(m){
         html+='<tr>';
         html+='<td style="font-weight:600;color:#5eead4">'+esc(m.customerName)+'</td>';
         html+='<td class="c-gray" style="font-family:monospace;font-size:11px">'+esc(m.date||"")+'</td>';
+        html+='<td><span class="pill pill-teal">'+esc(m.materialType||"--")+'</span></td>';
         html+='<td style="font-weight:600">'+fmt$(parseFloat(m.materialRevenue))+'</td>';
         html+='<td><span class="pill pill-amber">'+esc(m.salesperson||"")+'</span></td>';
         html+='<td style="color:#8fa8bc">'+esc(m.notes||"--")+'</td>';
@@ -699,7 +716,7 @@ function kpiCard(label,value,rawVal,target,targetLabel,formatFn,flip,tooltipText
 
 const emptyJob={client:"",tier:"Better",contractPrice:"",materialCost:"",laborCost:"",otherCosts:"",budgetedHours:"",actualHours:"",installStart:"",installEnd:"",status:"In Progress",salesperson:"",depositPct:50,midPct:25,finalPct:25,depositPaid:false,midPaid:false,finalPaid:false,actualAmountPaid:""};
 const emptyLead={customerName:"",estimateAmount:"",dateOfEstimate:"",salesperson:"",notes:"",leadSource:"Referral",status:"Pending"};
-const emptyMaterial={customerName:"",date:"",materialRevenue:"",salesperson:"",notes:""};
+const emptyMaterial={customerName:"",date:"",materialRevenue:"",materialType:"",salesperson:"",notes:""};
 let formData={};
 
 function openModal(type,id){
@@ -766,6 +783,7 @@ function renderModal(){
     fields+=field("Customer Name",'<input class="input" value="'+esc(formData.customerName||"")+'" oninput="fd(\'customerName\',this.value)" placeholder="e.g. Martinez Bath"/>');
     fields+=field("Date",'<input class="input" type="date" value="'+esc(formData.date||"")+'" oninput="fd(\'date\',this.value)"/>');
     fields+=field("Material Revenue ($)",'<input class="input" type="number" value="'+esc(formData.materialRevenue||"")+'" oninput="fd(\'materialRevenue\',this.value)"/>');
+    fields+=field("Type of Material",sel("materialType",["Flooring","Countertop","Cabinets","Tile"],formData.materialType||"Flooring"));
     fields+=field("Salesperson *",selRequired("salesperson",SALESPERSONS,formData.salesperson));
     fields+=field("Notes",'<input class="input" value="'+esc(formData.notes||"")+'" oninput="fd(\'notes\',this.value)" placeholder="Optional notes"/>');
     fields+='</div>';
@@ -868,12 +886,16 @@ async function submitLead(){
 
 async function submitMaterial(){
   if(!formData.customerName){alert("Customer name is required.");return;}
+  if(!formData.materialRevenue){alert("Material revenue is required.");return;}
   if(!formData.salesperson){alert("Salesperson is required.");return;}
   state.saving=true;render();
   try{
-    const s=await api("saveMaterial",formData);
-    state.materials=[...state.materials,s];
+    await api("saveMaterial",formData);
     state.modal=null;
+    const data=await api("getAll");
+    state.jobs=data.jobs||[];
+    state.leads=data.sales||[];
+    state.materials=data.materials||[];
   } catch(e){state.error=e.message;}
   state.saving=false;render();
 }
