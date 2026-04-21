@@ -227,6 +227,7 @@ const TARGETS={avgContract:30000,laborPct:.22,grossMargin:.30,installDays:6,jobs
 // NOTE: The Google Apps Script backend needs a 'sendEmail' action handler to deliver these notifications
 const EMAIL_RECIPIENTS=["sales@elevatekitchenandhome.com"];let state={
   jobs:[],leads:[],materials:[],tab:"dashboard",saving:false,error:null,modal:null,
+  refreshing:false,
   search:"",statusFilter:"All",sortCol:null,sortDir:"asc",expandedRows:new Set(),
   filterMonth:"All",filterSalesperson:"All",filterMargin:"All"
 };
@@ -424,10 +425,10 @@ function render(){
   const hasFilters=state.filterMonth!=="All"||state.filterSalesperson!=="All"||state.filterMargin!=="All";
 
   let html='<div style="background:#081929;min-height:100vh">';
-  if(state.error)html+='<div class="banner banner-red"><span>&#9888;&#65039; '+esc(state.error)+'</span><button class="btn-close" onclick="clearError()">&#x2715;</button></div>';
+  if(state.error)html+='<div class="banner banner-red"><span>&#9888;&#65039; '+esc(state.error)+'</span><button class="btn-primary" style="margin-left:12px;font-size:12px;padding:5px 12px" onclick="clearError();init()">Retry</button><button class="btn-close" onclick="clearError()">&#x2715;</button></div>';
 
   // Header
-  html+='<div class="header"><div class="header-left"><img class="logo-img" src="'+LOGO_SRC+'" alt="Elevate Kitchen &amp; Home"/></div><div class="header-right">'+(state.saving?'<span class="saving-text"><span class="spin" style="display:inline-block">&#x27F3;</span> Syncing&#x2026;</span>':'<span class="saving-text"><span class="live-dot"></span> Live</span>')+'</div></div>';
+  html+='<div class="header"><div class="header-left"><img class="logo-img" src="'+LOGO_SRC+'" alt="Elevate Kitchen &amp; Home"/></div><div class="header-right">'+(state.saving?'<span class="saving-text"><span class="spin" style="display:inline-block">&#x27F3;</span> Syncing&#x2026;</span>':state.refreshing?'<span class="saving-text"><span class="spin" style="display:inline-block">&#x27F3;</span> Refreshing&#x2026;</span>':'<span class="saving-text"><span class="live-dot"></span> Live</span>')+'</div></div>';
 
   // Tabs (now 3: Dashboard, Sales Pipeline, Salespeople)
   html+='<div class="tab-bar">';
@@ -1039,13 +1040,48 @@ async function togglePay(id,fld){
 }
 
 async function init(){
+  const CACHE_KEY='elevate_dash_v2';
+  let hasCache=false;
   try{
-    const data=await api("getAll");
-    state.jobs=data.jobs||[];
-    state.leads=data.sales||[];
-    state.materials=data.materials||[];
-  } catch(e){state.error="Could not connect to Google Sheets: "+e.message;}
-  render();
+    const raw=localStorage.getItem(CACHE_KEY);
+    if(raw){
+      const {d}=JSON.parse(raw);
+      state.jobs=d.jobs||[];
+      state.leads=d.sales||[];
+      state.materials=d.materials||[];
+      state.refreshing=true;
+      hasCache=true;
+      render();
+    }
+  }catch(e){}
+  if(!hasCache){
+    const t1=setTimeout(()=>{const el=document.querySelector('.loading-text');if(el)el.textContent='Still connecting\u2026 Google Sheets can be slow to start';},4000);
+    const t2=setTimeout(()=>{const el=document.querySelector('.loading-text');if(el)el.textContent='Almost there\u2026';},9000);
+    try{
+      const data=await api("getAll");
+      clearTimeout(t1);clearTimeout(t2);
+      state.jobs=data.jobs||[];
+      state.leads=data.sales||[];
+      state.materials=data.materials||[];
+      localStorage.setItem(CACHE_KEY,JSON.stringify({d:data,t:Date.now()}));
+    }catch(e){
+      clearTimeout(t1);clearTimeout(t2);
+      state.error="Could not connect to Google Sheets: "+e.message;
+    }
+    render();
+  }else{
+    try{
+      const data=await api("getAll");
+      state.jobs=data.jobs||[];
+      state.leads=data.sales||[];
+      state.materials=data.materials||[];
+      state.refreshing=false;
+      localStorage.setItem(CACHE_KEY,JSON.stringify({d:data,t:Date.now()}));
+    }catch(e){
+      state.refreshing=false;
+    }
+    render();
+  }
 }
 init();
 </script>
