@@ -261,16 +261,17 @@ function getMonthKey(dateStr){
 async function api(action,data={}){
   const payload=action!=="getAll"?"&data="+encodeURIComponent(JSON.stringify(data)):"";
   const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),12000);
+  const timer=setTimeout(()=>controller.abort(),10000);
+  const fetchPromise=fetch(SCRIPT_URL+"?action="+action+payload,{signal:controller.signal})
+    .then(r=>r.json())
+    .then(json=>{if(!json.ok)throw new Error(json.error);return json.data;});
+  const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error("Request timed out \u2014 check your Google Apps Script deployment.")),10500));
   try{
-    const res=await fetch(SCRIPT_URL+"?action="+action+payload,{signal:controller.signal});
+    const result=await Promise.race([fetchPromise,timeoutPromise]);
     clearTimeout(timer);
-    const json=await res.json();
-    if(!json.ok)throw new Error(json.error);
-    return json.data;
+    return result;
   }catch(e){
     clearTimeout(timer);
-    if(e.name==="AbortError")throw new Error("Request timed out — check your Google Apps Script deployment.");
     throw e;
   }
 }
@@ -1039,8 +1040,17 @@ async function togglePay(id,fld){
   state.saving=false;render();
 }
 
+function safeRender(){try{render();}catch(e){document.getElementById("app").innerHTML='<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px;background:#081929"><p style="color:#fca5a5;font-size:14px">&#9888;&#65039; Dashboard error: '+String(e.message)+'</p><button class="btn-primary" onclick="init()">Retry</button></div>';}}
+
 async function init(){
   const CACHE_KEY='elevate_dash_v2';
+  // Hard fallback: if still on loading screen after 13s, force render with error
+  const hardFallback=setTimeout(()=>{
+    if(document.querySelector('.loading')){
+      state.error="Connection timed out. Google Sheets did not respond.";
+      safeRender();
+    }
+  },13000);
   let hasCache=false;
   try{
     const raw=localStorage.getItem(CACHE_KEY);
@@ -1051,7 +1061,8 @@ async function init(){
       state.materials=d.materials||[];
       state.refreshing=true;
       hasCache=true;
-      render();
+      clearTimeout(hardFallback);
+      safeRender();
     }
   }catch(e){}
   if(!hasCache){
@@ -1059,16 +1070,16 @@ async function init(){
     const t2=setTimeout(()=>{const el=document.querySelector('.loading-text');if(el)el.textContent='Almost there\u2026';},9000);
     try{
       const data=await api("getAll");
-      clearTimeout(t1);clearTimeout(t2);
+      clearTimeout(t1);clearTimeout(t2);clearTimeout(hardFallback);
       state.jobs=data.jobs||[];
       state.leads=data.sales||[];
       state.materials=data.materials||[];
       localStorage.setItem(CACHE_KEY,JSON.stringify({d:data,t:Date.now()}));
     }catch(e){
-      clearTimeout(t1);clearTimeout(t2);
+      clearTimeout(t1);clearTimeout(t2);clearTimeout(hardFallback);
       state.error="Could not connect to Google Sheets: "+e.message;
     }
-    render();
+    safeRender();
   }else{
     try{
       const data=await api("getAll");
@@ -1080,7 +1091,7 @@ async function init(){
     }catch(e){
       state.refreshing=false;
     }
-    render();
+    safeRender();
   }
 }
 init();
