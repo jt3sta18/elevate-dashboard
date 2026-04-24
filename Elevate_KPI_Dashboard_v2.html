@@ -470,7 +470,14 @@ function render(){
   const hasFilters=state.filterMonth!=="All"||state.filterSalesperson!=="All"||state.filterMargin!=="All";
 
   let html='<div style="background:#081929;min-height:100vh">';
-  if(state.error)html+='<div class="banner banner-red"><span>&#9888;&#65039; '+esc(state.error)+'</span><button class="btn-primary" style="margin-left:12px;font-size:12px;padding:5px 12px" onclick="clearError();init()">Retry</button><button class="btn-close" onclick="clearError()">&#x2715;</button></div>';if(state.pendingDelete){html+='<div class="confirm-bar"><span>&#9888;&#65039; Tap Confirm to delete — this cannot be undone</span><div style="display:flex;gap:8px"><button class="btn-outline" onclick="state.pendingDelete=null;render()">Cancel</button><button class="btn-primary" style="background:linear-gradient(135deg,#ef4444,#b91c1c);color:#fff" onclick="confirmDelete()">Confirm Delete</button></div></div>';}
+  if(state.error)html+='<div class="banner banner-red"><span>&#9888;&#65039; '+esc(state.error)+'</span><button class="btn-primary" style="margin-left:12px;font-size:12px;padding:5px 12px" onclick="clearError();init()">Retry</button><button class="btn-close" onclick="clearError()">&#x2715;</button></div>';
+  // Diagnostic: if GAS returned data but materials are empty, show the raw keys so we know what to map
+  if(state._gasKeys&&state.materials.length===0&&(state.jobs.length>0||state.leads.length>0)){
+    html+='<div class="banner" style="background:rgba(251,191,36,.12);border-bottom:1px solid rgba(251,191,36,.3);color:#fbbf24;font-size:12px;gap:8px;flex-wrap:wrap">';
+    html+='<span>&#9888; Materials not syncing from Google Sheets. GAS returned keys: <strong>'+esc(state._gasKeys)+'</strong> — share this with your developer to fix the materials key name.</span>';
+    html+='<button class="btn-close" style="color:#fbbf24" onclick="state._gasKeys=null;render()">&#x2715;</button></div>';
+  }
+  if(state.pendingDelete){html+='<div class="confirm-bar"><span>&#9888;&#65039; Tap Confirm to delete — this cannot be undone</span><div style="display:flex;gap:8px"><button class="btn-outline" onclick="state.pendingDelete=null;render()">Cancel</button><button class="btn-primary" style="background:linear-gradient(135deg,#ef4444,#b91c1c);color:#fff" onclick="confirmDelete()">Confirm Delete</button></div></div>';}
 
   // Header
   html+='<div class="header"><div class="header-left"><img class="logo-img" src="'+LOGO_SRC+'" alt="Elevate Kitchen &amp; Home"/></div><div class="header-right">'+(state.saving?'<span class="saving-text"><span class="spin" style="display:inline-block">&#x27F3;</span> Syncing&#x2026;</span>':state.refreshing?'<span class="saving-text"><span class="spin" style="display:inline-block">&#x27F3;</span> Refreshing&#x2026;</span>':'<span class="saving-text"><span class="live-dot"></span> Live</span>')+'</div></div>';
@@ -1140,8 +1147,10 @@ async function init(){
       const data=await api("getAll");
       clearTimeout(t1);clearTimeout(t2);clearTimeout(hardFallback);
       state.jobs=data.jobs||[];
-      state.leads=data.sales||[];
-      state.materials=data.materials||data.materialsOnly||data.material||[];
+      state.leads=data.sales||data.leads||[];
+      state.materials=pickMaterials(data);
+      // Debug: store raw keys so we can show a diagnostic if materials are empty
+      state._gasKeys=Object.keys(data||{}).join(", ");
       localStorage.setItem(CACHE_KEY,JSON.stringify({d:data,t:Date.now()}));
     }catch(e){
       clearTimeout(t1);clearTimeout(t2);clearTimeout(hardFallback);
@@ -1152,8 +1161,9 @@ async function init(){
     try{
       const data=await api("getAll");
       state.jobs=data.jobs||[];
-      state.leads=data.sales||[];
-      state.materials=data.materials||data.materialsOnly||data.material||[];
+      state.leads=data.sales||data.leads||[];
+      state.materials=pickMaterials(data);
+      state._gasKeys=Object.keys(data||{}).join(", ");
       state.refreshing=false;
       localStorage.setItem(CACHE_KEY,JSON.stringify({d:data,t:Date.now()}));
     }catch(e){
@@ -1161,6 +1171,16 @@ async function init(){
     }
     safeRender();
   }
+}
+// Try every reasonable key name GAS might use for the materials array
+function pickMaterials(data){
+  const keys=["materials","materialsOnly","material","Materials","MaterialsOnly","materialOrders","material_orders","matOrders","materialJobs","materialonly"];
+  for(const k of keys){if(Array.isArray(data[k])&&data[k].length>0)return data[k];}
+  // Last resort: look for any array value that has materialRevenue or materialCost fields
+  for(const k of Object.keys(data||{})){
+    if(Array.isArray(data[k])&&data[k].length>0&&(data[k][0].materialRevenue!=null||data[k][0].materialCost!=null))return data[k];
+  }
+  return[];
 }
 init();
 </script>
