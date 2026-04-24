@@ -239,6 +239,11 @@ tr:hover td{background:#143249}
   .kpi-value{font-size:20px}
   .section-label{font-size:10px;margin-bottom:10px}
 }
+
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#34d399;color:#0a2a1a;font-weight:700;font-size:14px;padding:12px 24px;border-radius:12px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.4);animation:fadeInUp .3s ease;white-space:nowrap}
+.form-error{background:rgba(127,29,29,.45);border:1px solid #991b1b;color:#fca5a5;font-size:13px;padding:10px 14px;border-radius:10px;margin-bottom:10px}
+.confirm-bar{background:rgba(127,29,29,.5);border:1px solid #991b1b;border-radius:12px;padding:12px 16px;margin:16px 32px;display:flex;align-items:center;justify-content:space-between;gap:12px;animation:fadeIn .2s ease}
+.confirm-bar span{color:#fca5a5;font-size:13px;font-weight:600}
 </style>
 </head>
 <body>
@@ -253,7 +258,7 @@ const TARGETS={avgContract:30000,laborPct:.22,grossMargin:.30,installDays:6,jobs
 // NOTE: The Google Apps Script backend needs a 'sendEmail' action handler to deliver these notifications
 const EMAIL_RECIPIENTS=["sales@elevatekitchenandhome.com"];let state={
   jobs:[],leads:[],materials:[],tab:"dashboard",saving:false,error:null,modal:null,
-  refreshing:false,
+  refreshing:false,formError:null,toast:null,pendingDelete:null,
   search:"",statusFilter:"All",sortCol:null,sortDir:"asc",expandedRows:new Set(),
   filterMonth:"All",filterSalesperson:"All",filterMargin:"All"
 };
@@ -452,7 +457,7 @@ function render(){
   const hasFilters=state.filterMonth!=="All"||state.filterSalesperson!=="All"||state.filterMargin!=="All";
 
   let html='<div style="background:#081929;min-height:100vh">';
-  if(state.error)html+='<div class="banner banner-red"><span>&#9888;&#65039; '+esc(state.error)+'</span><button class="btn-primary" style="margin-left:12px;font-size:12px;padding:5px 12px" onclick="clearError();init()">Retry</button><button class="btn-close" onclick="clearError()">&#x2715;</button></div>';
+  if(state.error)html+='<div class="banner banner-red"><span>&#9888;&#65039; '+esc(state.error)+'</span><button class="btn-primary" style="margin-left:12px;font-size:12px;padding:5px 12px" onclick="clearError();init()">Retry</button><button class="btn-close" onclick="clearError()">&#x2715;</button></div>';if(state.pendingDelete){html+='<div class="confirm-bar"><span>&#9888;&#65039; Tap Confirm to delete — this cannot be undone</span><div style="display:flex;gap:8px"><button class="btn-outline" onclick="state.pendingDelete=null;render()">Cancel</button><button class="btn-primary" style="background:linear-gradient(135deg,#ef4444,#b91c1c);color:#fff" onclick="confirmDelete()">Confirm Delete</button></div></div>';}
 
   // Header
   html+='<div class="header"><div class="header-left"><img class="logo-img" src="'+LOGO_SRC+'" alt="Elevate Kitchen &amp; Home"/></div><div class="header-right">'+(state.saving?'<span class="saving-text"><span class="spin" style="display:inline-block">&#x27F3;</span> Syncing&#x2026;</span>':state.refreshing?'<span class="saving-text"><span class="spin" style="display:inline-block">&#x27F3;</span> Refreshing&#x2026;</span>':'<span class="saving-text"><span class="live-dot"></span> Live</span>')+'</div></div>';
@@ -801,7 +806,7 @@ function render(){
   }
 
   html+='</div></div>';
-  if(state.modal)html+=renderModal();
+  if(state.toast)html+='<div class="toast">&#x2713; '+state.toast+'</div>';if(state.modal)html+=renderModal();
   app.innerHTML=html;
 }
 
@@ -926,7 +931,7 @@ function renderModal(){
   }
 
   var saveAction=type==="job"?"submitJob()":type==="lead"?"submitLead()":"submitMaterial()";
-  return'<div class="modal-overlay" onclick="handleOverlayClick(event)"><div class="modal-box" onclick="event.stopPropagation()"><div class="modal-header"><h2>'+title+'</h2><button class="btn-close" onclick="closeModal()">&#x2715;</button></div><div class="modal-body">'+fields+'<div class="modal-footer"><button class="btn-outline" onclick="closeModal()">Cancel</button><button class="btn-primary" onclick="'+saveAction+'" '+(state.saving?"disabled":"")+'>'+  (state.saving?"Saving&#x2026;":(isEdit?"Save Changes":"Add "+(type==="job"?"Job":type==="lead"?"Lead":"Materials")))+'</button></div></div></div></div>';
+  return'<div class="modal-overlay" onclick="handleOverlayClick(event)"><div class="modal-box" onclick="event.stopPropagation()"><div class="modal-header"><h2>'+title+'</h2><button class="btn-close" onclick="closeModal()">&#x2715;</button></div><div class="modal-body">'+fields+(state.formError?'<div class="form-error">&#9888; '+esc(state.formError)+'</div>':'')+'<div class="modal-footer"><button class="btn-outline" onclick="closeModal()">Cancel</button><button class="btn-primary" onclick="'+saveAction+'" '+(state.saving?"disabled":"")+'>'+  (state.saving?"Saving&#x2026;":(isEdit?"Save Changes":"Add "+(type==="job"?"Job":type==="lead"?"Lead":"Materials")))+'</button></div></div></div></div>';
 }
 
 function field(label,input){return'<div class="field"><label>'+label+'</label>'+input+'</div>';}
@@ -957,24 +962,21 @@ function fdPayment(pct){
   render();
 }
 
-async function deleteJob(id){
-  if(!confirm("Delete this job?"))return;
+async function deleteJob(id){if(state.pendingDelete?.id!==id){state.pendingDelete={type:'job',id};render();return;}
   state.saving=true;render();
   try{await api("deleteJob",{id});state.jobs=state.jobs.filter(j=>String(j.id)!==String(id));}
   catch(e){state.error=e.message;}
   state.saving=false;render();
 }
 
-async function deleteLead(id){
-  if(!confirm("Delete this lead?"))return;
+async function deleteLead(id){if(state.pendingDelete?.id!==id){state.pendingDelete={type:'lead',id};render();return;}
   state.saving=true;render();
   try{await api("deleteLead",{id});state.leads=state.leads.filter(l=>String(l.id)!==String(id));}
   catch(e){state.error=e.message;}
   state.saving=false;render();
 }
 
-async function deleteMaterial(id){
-  if(!confirm("Delete this materials entry?"))return;
+async function deleteMaterial(id){if(state.pendingDelete?.id!==id){state.pendingDelete={type:'material',id};render();return;}
   state.saving=true;render();
   try{await api("deleteMaterial",{id});state.materials=state.materials.filter(m=>String(m.id)!==String(id));}
   catch(e){state.error=e.message;}
@@ -982,19 +984,13 @@ async function deleteMaterial(id){
 }
 
 async function submitJob(){
-  if(!formData.client){alert("Client name is required.");return;}
-  if(!formData.salesperson){alert("Salesperson is required.");return;}
-  state.saving=true;render();
-  try{
-    const editId=state.modal.editId;
-    if(editId){
+  state.formError=null;if(!formData.client){state.formError="Client name is required.";safeRender();return;}if(!formData.salesperson){state.formError="Salesperson is required — please select one.";safeRender();return;}state.saving=true;safeRender();try{const editId=state.modal.editId;if(editId){
       const u={...formData,id:editId};
       await api("updateJob",u);
       state.jobs=state.jobs.map(j=>String(j.id)===String(editId)?u:j);
     } else {
       const s=await api("saveJob",formData);
-      state.jobs=[...state.jobs,s];
-      sendEmailNotification("New Job",{...formData,...s});
+      state.jobs=[...state.jobs,s];showToast('Job saved!');sendEmailNotification("New Job",{...formData,...s});
     }
     state.modal=null;
   } catch(e){state.error=e.message;}
@@ -1002,14 +998,7 @@ async function submitJob(){
 }
 
 async function submitLead(){
-  if(!formData.customerName){alert("Customer name is required.");return;}
-  if(!formData.salesperson){alert("Salesperson is required.");return;}
-  state.saving=true;render();
-  try{
-    const editId=state.modal.editId;
-    if(editId){
-      const u={...formData,id:editId};
-      await api("updateLead",u);
+  state.formError=null;if(!formData.customerName){state.formError="Customer name is required.";safeRender();return;}if(!formData.salesperson){state.formError="Salesperson is required — please select one.";safeRender();return;}state.saving=true;safeRender();try{const editId=state.modal.editId;if(editId){const u={...formData,id:editId};await api("updateLead",u);
       state.leads=state.leads.map(l=>String(l.id)===String(editId)?u:l);
       // If status changed to Won, convert to job
       if(formData.status==="Won"){
@@ -1023,8 +1012,7 @@ async function submitLead(){
       }
     } else {
       const s=await api("saveLead",formData);
-      state.leads=[...state.leads,s];
-      // Auto-convert if Won
+      state.leads=[...state.leads,s];showToast('Lead saved!');// Auto-convert if Won
       if(formData.status==="Won"){
         const jobPayload={client:formData.customerName,salesperson:formData.salesperson,contractPrice:formData.estimateAmount||"",tier:"Better",status:"In Progress",materialCost:"",laborCost:"",otherCosts:"",budgetedHours:"",actualHours:"",installStart:"",installEnd:"",depositPct:50,midPct:25,finalPct:25,depositPaid:false,midPaid:false,finalPaid:false,sourceLeadId:s.id};
         const newJob=await api("saveJob",jobPayload);
@@ -1038,9 +1026,7 @@ async function submitLead(){
 }
 
 async function submitMaterial(){
-  if(!formData.customerName){alert("Customer name is required.");return;}
-  if(!formData.salesperson){alert("Salesperson is required.");return;}
-  state.saving=true;render();
+  state.formError=null;if(!formData.customerName){state.formError="Customer name is required.";safeRender();return;}if(!formData.salesperson){state.formError="Salesperson is required — please select one.";safeRender();return;}state.saving=true;safeRender();
   try{
     const editId=state.modal.editId;
     if(editId){
@@ -1049,11 +1035,7 @@ async function submitMaterial(){
       state.materials=state.materials.map(m=>String(m.id)===String(editId)?u:m);
     } else {
       const s=await api("saveMaterial",formData);
-      state.materials=[...state.materials,s];
-    }
-    state.modal=null;
-  } catch(e){state.error=e.message;}
-  state.saving=false;render();
+      state.materials=[...state.materials,s];showToast('Materials saved!');}state.modal=null;}catch(e){state.error=e.message;}state.saving=false;safeRender();
 }
 
 async function togglePay(id,fld){
@@ -1066,6 +1048,16 @@ async function togglePay(id,fld){
   state.saving=false;render();
 }
 
+
+function showToast(msg){state.toast=msg;safeRender();setTimeout(()=>{state.toast=null;safeRender();},3000);}
+async function confirmDelete(){
+  const pd=state.pendingDelete;
+  if(!pd)return;
+  state.pendingDelete=null;
+  if(pd.type==='job')await deleteJob(pd.id);
+  else if(pd.type==='lead')await deleteLead(pd.id);
+  else await deleteMaterial(pd.id);
+}
 function safeRender(){try{render();}catch(e){document.getElementById("app").innerHTML='<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px;background:#081929"><p style="color:#fca5a5;font-size:14px">&#9888;&#65039; Dashboard error: '+String(e.message)+'</p><button class="btn-primary" onclick="init()">Retry</button></div>';}}
 
 async function init(){
