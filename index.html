@@ -668,28 +668,36 @@ function render(){
 
     var sortCls=function(col){return state.sortCol===col?state.sortDir:'';};
 
-    // Show materials only section if filter is "Materials Only"
+    // Build the filtered materials list (applies search too)
+    var matListForTable=filteredMats.filter(function(m){return !state.search||(m.customerName||"").toLowerCase().includes(state.search.toLowerCase());});
+
     if(state.statusFilter==="Materials Only"){
-      const matList=filteredMats.filter(m=>!state.search||(m.customerName||"").toLowerCase().includes(state.search.toLowerCase()));
-      html+='<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Date</th><th>Revenue</th><th>Cost</th><th>Type</th><th>Sq Ft</th><th>Status</th><th>Paid</th><th>Salesperson</th><th>Notes</th><th></th></tr></thead><tbody>';
-      if(matList.length===0){html+='<tr class="empty-row"><td colspan="11">No materials-only entries yet.</td></tr>';}
-      else{matList.forEach(function(m){
+      // Materials-only dedicated view
+      html+='<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Date</th><th>Revenue</th><th>Cost</th><th>Margin</th><th>Type</th><th>Sq Ft</th><th>Status</th><th>Paid</th><th>Salesperson</th><th>Notes</th><th></th></tr></thead><tbody>';
+      if(matListForTable.length===0){html+='<tr class="empty-row"><td colspan="12">No materials-only entries yet.</td></tr>';}
+      else{matListForTable.forEach(function(m){
+        var mRev=parseFloat(m.materialRevenue)||0,mCost=parseFloat(m.materialCost)||0;
+        var mMargin=mRev>0?(mRev-mCost)/mRev:null;
         var paidAmt=parseFloat(m.paymentAmount)||0;
-        html+='<tr><td style="font-weight:600;color:#EDE0C4">'+esc(m.customerName)+'</td>';
+        var balLeft=mRev-paidAmt;
+        html+='<tr>';
+        html+='<td style="font-weight:600;color:#EDE0C4">'+esc(m.customerName)+'</td>';
         html+='<td class="c-gray" style="font-family:monospace;font-size:11px">'+esc(m.date||"")+'</td>';
-        html+='<td style="font-weight:600;color:#5eead4">'+fmt$(parseFloat(m.materialRevenue))+'</td>';
-        html+='<td style="color:#f87171">'+fmt$(parseFloat(m.materialCost))+'</td>';
+        html+='<td style="font-weight:600;color:#5eead4">'+fmt$(mRev)+'</td>';
+        html+='<td style="color:#f87171">'+fmt$(mCost)+'</td>';
+        html+='<td class="'+(mMargin!=null?(mMargin>=TARGETS.grossMargin?"c-green":"c-red"):"c-gray")+'" style="font-weight:600">'+fmtPct(mMargin)+'</td>';
         html+='<td><span class="pill pill-blue">'+esc(m.typeOfMaterial||"—")+'</span></td>';
         html+='<td class="c-gray">'+esc(m.sqFt||"—")+'</td>';
         html+='<td><span class="pill '+(m.status==="Paid"?"pill-green":m.status==="Invoiced"?"pill-amber":"pill-gray")+'">'+esc(m.status||"Pending")+'</span></td>';
-        html+='<td style="color:#a0aec0">'+fmt$(paidAmt)+'</td>';
+        html+='<td style="font-weight:600;color:'+(balLeft<=0?"#34d399":"#f87171")+'">'+fmt$(paidAmt)+'<br><span style="font-size:10px;color:#8fa8bc">bal '+fmt$(balLeft)+'</span></td>';
         html+='<td><span class="pill pill-amber">'+esc(m.salesperson||"")+'</span></td>';
         html+='<td style="color:#8fa8bc;max-width:160px;overflow:hidden;text-overflow:ellipsis">'+esc(m.notes||"—")+'</td>';
-        html+='<td onclick="event.stopPropagation()"><button class="btn-ghost" onclick="editMaterial(\''+m.id+'\')">&#x270E;</button> <button class="btn-ghost del" onclick="deleteMaterial(\''+m.id+'\')">&#x2715;</button></td></tr>';
+        html+='<td onclick="event.stopPropagation()"><button class="btn-ghost" onclick="editMaterial(\''+m.id+'\')">&#x270E;</button> <button class="btn-ghost del" onclick="deleteMaterial(\''+m.id+'\')">&#x2715;</button></td>';
+        html+='</tr>';
       });}
       html+='</tbody></table></div>';
     } else {
-      // Normal jobs table
+      // Combined jobs + materials table (materials shown inline when filter is All)
       html+='<div class="table-wrap"><table><thead><tr>';
       html+='<th style="width:28px"></th>';
       html+='<th class="sortable '+sortCls('client')+'" onclick="toggleSort(\'client\')">Client</th>';
@@ -702,7 +710,10 @@ function render(){
       html+='<th class="sortable '+sortCls('balanceDue')+'" onclick="toggleSort(\'balanceDue\')">Balance</th>';
       html+='<th></th><th></th></tr></thead><tbody>';
 
-      if(filtered.length===0){
+      var hasJobRows=filtered.length>0;
+      var hasMatRows=state.statusFilter==="All"&&matListForTable.length>0;
+
+      if(!hasJobRows&&!hasMatRows){
         html+='<tr class="empty-row"><td colspan="14">'+(state.search||state.statusFilter!=='All'?'No matching jobs.':'No jobs yet. Click "+ Job" to add one.')+'</td></tr>';
       } else {
         filtered.forEach(function(j){
@@ -751,6 +762,35 @@ function render(){
             html+='</div></td></tr>';
           }
         });
+        // Materials rows appended to the bottom of the All view
+        if(hasMatRows){
+          if(hasJobRows){
+            html+='<tr><td colspan="14" style="padding:6px 12px;background:rgba(94,234,212,.06);border-top:1px solid rgba(94,234,212,.15)"><span style="font-size:10px;color:#5eead4;font-weight:700;text-transform:uppercase;letter-spacing:.08em">&#x2014; Materials Only ('+matListForTable.length+')</span></td></tr>';
+          }
+          matListForTable.forEach(function(m){
+            var mRev=parseFloat(m.materialRevenue)||0,mCost=parseFloat(m.materialCost)||0;
+            var mMargin=mRev>0?(mRev-mCost)/mRev:null;
+            var mmc=mMargin!=null?(mMargin>=TARGETS.grossMargin?"c-green":"c-red"):"c-gray";
+            var paidAmt=parseFloat(m.paymentAmount)||0;
+            var balLeft=mRev-paidAmt;
+            var mStatus=m.status||"Pending";
+            var mStatusPill=mStatus==="Paid"?"pill-green":mStatus==="Invoiced"?"pill-amber":"pill-gray";
+            html+='<tr style="background:rgba(94,234,212,.03)">';
+            html+='<td></td>';
+            html+='<td style="font-weight:600;color:#EDE0C4">'+esc(m.customerName)+'</td>';
+            html+='<td><span class="pill pill-teal" style="font-size:10px">Materials</span></td>';
+            html+='<td><span class="pill pill-blue" style="font-size:10px">'+esc(m.salesperson||"—")+'</span></td>';
+            html+='<td style="font-weight:600;color:#5eead4">'+fmt$(mRev)+'</td>';
+            html+='<td class="'+mmc+'" style="font-weight:600">'+fmtPct(mMargin)+'</td>';
+            html+='<td class="c-gray">'+esc(m.typeOfMaterial||"—")+'</td>';
+            html+='<td><span class="pill '+mStatusPill+'">'+esc(mStatus)+'</span></td>';
+            html+='<td colspan="3" class="c-gray" style="font-size:11px">'+esc(m.date||"")+'</td>';
+            html+='<td style="font-weight:600;color:'+(balLeft<=0?"#34d399":"#f87171")+'">'+fmt$(balLeft)+'</td>';
+            html+='<td onclick="event.stopPropagation()"><button class="btn-ghost" onclick="editMaterial(\''+m.id+'\')">&#x270E;</button></td>';
+            html+='<td onclick="event.stopPropagation()"><button class="btn-ghost del" onclick="deleteMaterial(\''+m.id+'\')">&#x2715;</button></td>';
+            html+='</tr>';
+          });
+        }
       }
       html+='</tbody></table></div>';
     }
