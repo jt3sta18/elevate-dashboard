@@ -377,12 +377,16 @@ function applyGlobalMaterialFilters(mats){
   return list;
 }
 
-// Feature 2: Close Rate = Won / (Won + Lost) — excludes Pending and Materials
+// Close Rate = Won / (Won + Lost) — excludes Pending
 function calcKpis(enriched,leads){
   const completed=enriched.filter(j=>j.status==="Completed");
+  const active=enriched.filter(j=>j.status!=="Cancelled"); // exclude cancelled from averages
   const totalRevenue=completed.reduce((s,j)=>s+j.contractPrice,0);
-  const avgContract=enriched.length?enriched.reduce((s,j)=>s+j.contractPrice,0)/enriched.length:null;
-  const avgInstallDays=completed.length?completed.reduce((s,j)=>s+(j.installDays||0),0)/completed.length:null;
+  // Avg contract uses non-cancelled jobs only (cancelled deals skew deal size down)
+  const avgContract=active.length?active.reduce((s,j)=>s+j.contractPrice,0)/active.length:null;
+  // Avg install days: only count completed jobs that actually have both dates entered
+  const daysJobs=completed.filter(j=>j.installDays!=null);
+  const avgInstallDays=daysJobs.length?daysJobs.reduce((s,j)=>s+j.installDays,0)/daysJobs.length:null;
   const totLab=completed.reduce((s,j)=>s+j.laborCost,0),totCon=completed.reduce((s,j)=>s+j.contractPrice,0);
   const avgLaborPct=totCon?totLab/totCon:null;
   const totProfit=completed.reduce((s,j)=>s+j.grossProfit,0);
@@ -395,8 +399,10 @@ function calcKpis(enriched,leads){
   const avgSold=wonLeads.length?wonLeads.reduce((s,l)=>s+(parseFloat(l.estimateAmount)||0),0)/wonLeads.length:null;
   return{
     totalRevenue,avgContract,avgInstallDays,avgLaborPct,avgGrossMargin,closeRate,avgSold,
-    completedCount:completed.length,totalLeads:leads.length,totalJobs:enriched.length,
+    completedCount:completed.length,totalLeads:leads.length,
+    totalJobs:active.length, // non-cancelled only — cancelled jobs are excluded from active count
     inProgress:enriched.filter(j=>j.status==="In Progress").length,
+    cancelledCount:enriched.filter(j=>j.status==="Cancelled").length,
     wonCount:wonLeads.length,lostCount:lostLeads.length,
     pendingCount:leads.filter(l=>!l.status||l.status==="Pending").length,
     totalProfit:totProfit,avgProfitPerJob:completed.length?totProfit/completed.length:null
@@ -432,21 +438,24 @@ function progressBar(current,target,flip){
   return'<div class="progress-wrap"><div class="progress-bar"><div class="progress-fill '+(good?'good':'bad')+'" style="--fill:'+clamped+'%"></div></div></div>';
 }
 
-// Feature 5: Per-salesperson KPIs
+// Per-salesperson KPIs
 function calcSpKpis(sp,enriched,leads){
   const spJobs=enriched.filter(j=>j.salesperson===sp);
   const spLeads=leads.filter(l=>l.salesperson===sp);
   const completed=spJobs.filter(j=>j.status==="Completed");
+  const active=spJobs.filter(j=>j.status!=="Cancelled"); // exclude cancelled from counts/averages
   const totalRevenue=completed.reduce((s,j)=>s+j.contractPrice,0);
   const totProfit=completed.reduce((s,j)=>s+j.grossProfit,0);
-  const totCon=completed.reduce((s,j)=>s+j.contractPrice,0);
+  const totCon=totalRevenue; // same value — completed contract prices
   const grossMarginPct=totCon?totProfit/totCon:null;
-  const avgDealSize=spJobs.length?spJobs.reduce((s,j)=>s+j.contractPrice,0)/spJobs.length:null;
+  // Avg deal size from active (non-cancelled) jobs only
+  const avgDealSize=active.length?active.reduce((s,j)=>s+j.contractPrice,0)/active.length:null;
   const avgProfitPerJob=completed.length?totProfit/completed.length:null;
   const won=spLeads.filter(l=>l.status==="Won").length;
   const lost=spLeads.filter(l=>l.status==="Lost").length;
   const closeRate=(won+lost)?won/(won+lost):null;
-  return{sp,totalRevenue,totalProfit:totProfit,grossMarginPct,avgDealSize,avgProfitPerJob,jobCount:spJobs.length,completedCount:completed.length,leadsCount:spLeads.length,wonCount:won,lostCount:lost,closeRate};
+  return{sp,totalRevenue,totalProfit:totProfit,grossMarginPct,avgDealSize,avgProfitPerJob,
+    jobCount:active.length,completedCount:completed.length,leadsCount:spLeads.length,wonCount:won,lostCount:lost,closeRate};
 }
 
 function render(){
@@ -536,25 +545,31 @@ function render(){
     });
     html+='</div></div></div>';
 
-    // ── Feature 5: Jobs Statistics Section ──
+    // ── Jobs Statistics Section ──
     var allEnrichedForStats=enrich(state.jobs);
     var jobsFiltered=applyGlobalFilters(allEnrichedForStats);
-    var jTotalRev=jobsFiltered.reduce(function(s,j){return s+(j.contractPrice||0);},0);
-    var jTotalCost=jobsFiltered.reduce(function(s,j){return s+(j.totalCost||0);},0);
+    // Exclude cancelled jobs from all financial calculations — a cancelled deal is not revenue
+    var jobsActive=jobsFiltered.filter(function(j){return j.status!=="Cancelled";});
+    var jobsCompleted=jobsFiltered.filter(function(j){return j.status==="Completed";});
+    var jTotalRev=jobsCompleted.reduce(function(s,j){return s+(j.contractPrice||0);},0);
+    var jPipelineRev=jobsActive.reduce(function(s,j){return s+(j.contractPrice||0);},0);
+    var jTotalCost=jobsCompleted.reduce(function(s,j){return s+(j.totalCost||0);},0);
     var jTotalProfit=jTotalRev-jTotalCost;
     var jMarginPct=jTotalRev>0?jTotalProfit/jTotalRev:null;
-    var jCount=jobsFiltered.length;
-    var jAvgRev=jCount>0?jTotalRev/jCount:null;
-    var jAvgProfit=jCount>0?jTotalProfit/jCount:null;
+    var jCount=jobsActive.length;
+    var jCompletedCount=jobsCompleted.length;
+    var jAvgRev=jobsActive.length>0?jPipelineRev/jobsActive.length:null;
+    var jAvgProfit=jCompletedCount>0?jTotalProfit/jCompletedCount:null;
     html+='<div class="section-gap"><div class="section-label">Jobs Statistics</div>';
     html+='<div style="background:#0E2A3F;border:1px solid #1a3a52;border-radius:14px;padding:18px 20px;animation:fadeInUp .4s ease both">';
     html+='<div style="display:flex;flex-wrap:wrap;gap:20px;margin-bottom:16px">';
-    html+='<div><div style="font-size:9px;color:#8fa8bc;text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:4px">Total Revenue</div><div style="font-size:20px;font-weight:700;color:#EDE0C4">'+fmt$(jTotalRev)+'</div></div>';
+    html+='<div><div style="font-size:9px;color:#8fa8bc;text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:4px">Completed Revenue</div><div style="font-size:20px;font-weight:700;color:#EDE0C4">'+fmt$(jTotalRev)+'</div></div>';
+    html+='<div><div style="font-size:9px;color:#8fa8bc;text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:4px">Pipeline Value</div><div style="font-size:20px;font-weight:700;color:#5eead4">'+fmt$(jPipelineRev)+'</div></div>';
     html+='<div><div style="font-size:9px;color:#8fa8bc;text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:4px">Total Cost</div><div style="font-size:20px;font-weight:700;color:#f87171">'+fmt$(jTotalCost)+'</div></div>';
     html+='<div><div style="font-size:9px;color:#8fa8bc;text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:4px">Gross Profit</div><div style="font-size:20px;font-weight:700;color:'+(jTotalProfit>=0?"#34d399":"#f87171")+'">'+fmt$(jTotalProfit)+'</div></div>';
     html+='<div><div style="font-size:9px;color:#8fa8bc;text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:4px">GP Margin</div><div style="font-size:20px;font-weight:700;color:'+(jMarginPct!=null?(jMarginPct>=TARGETS.grossMargin?"#34d399":"#f87171"):"#8fa8bc")+'">'+fmtPct(jMarginPct)+'</div></div>';
-    html+='<div><div style="font-size:9px;color:#8fa8bc;text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:4px"># Jobs</div><div style="font-size:20px;font-weight:700;color:#EDE0C4">'+jCount+'</div></div>';
-    html+='<div><div style="font-size:9px;color:#8fa8bc;text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:4px">Avg Rev / Job</div><div style="font-size:20px;font-weight:700;color:#EDE0C4">'+fmt$(jAvgRev)+'</div></div>';
+    html+='<div><div style="font-size:9px;color:#8fa8bc;text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:4px">Active Jobs</div><div style="font-size:20px;font-weight:700;color:#EDE0C4">'+jCount+'</div></div>';
+    html+='<div><div style="font-size:9px;color:#8fa8bc;text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:4px">Avg Deal Size</div><div style="font-size:20px;font-weight:700;color:#EDE0C4">'+fmt$(jAvgRev)+'</div></div>';
     html+='<div><div style="font-size:9px;color:#8fa8bc;text-transform:uppercase;letter-spacing:.1em;font-weight:600;margin-bottom:4px">Avg Profit / Job</div><div style="font-size:20px;font-weight:700;color:'+(jAvgProfit!=null&&jAvgProfit>=0?"#34d399":"#f87171")+'">'+fmt$(jAvgProfit)+'</div></div>';
     html+='</div>';
     // Breakdown by job type — always show all types, with target vs actual progress
@@ -562,9 +577,10 @@ function render(){
     html+='<div style="border-top:1px solid #1a3a52;padding-top:12px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><div style="font-size:9px;color:#8fa8bc;text-transform:uppercase;letter-spacing:.1em;font-weight:600">Revenue by Job Type</div><div style="font-size:10px;color:#8fa8bc">Tap a card to set revenue target</div></div>';
     html+='<div style="display:flex;flex-wrap:wrap;gap:10px">';
     JOB_TYPES.forEach(function(jt){
+      // Only non-cancelled jobs — cancelled deals are not revenue
       var jtJobs=jobsFiltered.filter(function(j){
         var types=Array.isArray(j.jobTypes)?j.jobTypes:[];
-        return types.includes(jt);
+        return types.includes(jt)&&j.status!=="Cancelled";
       });
       var jtRev=jtJobs.reduce(function(s,j){return s+(j.contractPrice||0);},0);
       var jtCost=jtJobs.reduce(function(s,j){return s+(j.totalCost||0);},0);
